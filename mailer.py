@@ -25,6 +25,16 @@ def _as_list(recipients) -> list[str]:
     return [x for x in recipients if x]
 
 
+def clean_password(pw) -> str:
+    """앱 비밀번호에서 모든 공백/개행/탭 제거 (붙여넣기 실수 방지)."""
+    return "".join(str(pw).split())
+
+
+def clean_addr(addr) -> str:
+    """주소 앞뒤 공백·따옴표·개행 제거."""
+    return str(addr).strip().strip('"').strip("'").strip()
+
+
 def validate_config(config: dict) -> list[str]:
     """누락된 필수 키 목록 반환(비어 있으면 정상)."""
     missing = []
@@ -43,7 +53,9 @@ def send_report(config: dict, subject: str, html: str,
     if missing:
         raise ValueError(f"메일 설정 누락: {', '.join(missing)}")
 
-    sender = config.get("sender") or config["user"]
+    user = clean_addr(config["user"])
+    password = clean_password(config["password"])
+    sender = clean_addr(config.get("sender") or config["user"])
     recipients = _as_list(config["recipients"])
 
     msg = MIMEMultipart("related")
@@ -67,11 +79,11 @@ def send_report(config: dict, subject: str, html: str,
     if port == 465:
         ctx = ssl.create_default_context()
         with smtplib.SMTP_SSL(host, port, context=ctx, timeout=30) as server:
-            server.login(config["user"], config["password"])
+            server.login(user, password)
             server.sendmail(sender, recipients, msg.as_string())
     else:
         with smtplib.SMTP(host, port, timeout=30) as server:
             server.ehlo()
             server.starttls(context=ssl.create_default_context())
-            server.login(config["user"], config["password"])
+            server.login(user, password)
             server.sendmail(sender, recipients, msg.as_string())

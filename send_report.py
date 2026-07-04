@@ -14,7 +14,7 @@ import argparse
 import os
 import sys
 
-from mailer import send_report, validate_config
+from mailer import clean_addr, clean_password, send_report, validate_config
 from monitor import BASE_URL, check_all
 from report import build_chart_png, build_html, summarize
 
@@ -42,6 +42,16 @@ def main() -> int:
     if missing:
         print(f"[ERROR] SMTP 환경변수 누락: {', '.join(missing)}", file=sys.stderr)
         return 2
+
+    # --- 자격증명 진단(값은 노출하지 않고 형태만 확인) ---
+    u = clean_addr(config["user"])
+    p = clean_password(config["password"])
+    print("[DIAG] SMTP_HOST =", config["host"], "PORT =", config["port"])
+    print(f"[DIAG] SMTP_USER 는 이메일 형식인가: {'@' in u and u.lower().endswith('gmail.com')} "
+          f"(도메인={u.split('@')[-1] if '@' in u else '없음'})")
+    print(f"[DIAG] 앱비밀번호 길이(공백제거 후): {len(p)}  (정상=16)")
+    if len(p) != 16:
+        print("[WARN] 앱 비밀번호가 16자가 아닙니다. 일반 로그인 비밀번호를 넣었거나 값이 잘못됐을 수 있습니다.")
 
     print(f"[INFO] 점검 시작 (mode={args.mode}, verify={args.verify})")
     results = check_all(timeout=args.timeout, verify=args.verify)
