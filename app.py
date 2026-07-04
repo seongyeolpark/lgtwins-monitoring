@@ -13,7 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from monitor import BASE_URL, TARGETS, check_all, now_kst
+from monitor import APP_URL, BASE_URL, TARGETS, check_all, now_kst
 from mailer import send_report, validate_config
 from report import build_report
 
@@ -320,6 +320,7 @@ def render_dashboard(cfg):
 def main():
     init_state()
     st.title("⚾ LG 트윈스 홈페이지 모니터링")
+    st.markdown(f"🔗 **대시보드 주소:** [{APP_URL}]({APP_URL})")
     cfg = sidebar_controls()
 
     if not cfg["targets"]:

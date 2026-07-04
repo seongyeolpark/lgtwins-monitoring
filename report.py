@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 
-from monitor import now_kst
+from monitor import APP_URL, now_kst
 
 LEVEL_COLOR = {"UP": "#2ecc71", "SLOW": "#f1c40f", "WARN": "#e67e22", "DOWN": "#e74c3c"}
 LEVEL_LABEL = {"UP": "정상", "SLOW": "느림", "WARN": "경고", "DOWN": "장애"}
@@ -244,6 +244,8 @@ def build_report(results, base_url: str):
       font-family:'Malgun Gothic','Apple SD Gothic Neo',AppleGothic,sans-serif;color:{TXT};">
     <div style="max-width:820px;margin:0 auto;padding:22px;">
       <h2 style="margin:0 0 4px;color:{TXT};">⚾ LG 트윈스 홈페이지 모니터링</h2>
+      <div style="margin:2px 0 6px;font-size:13px;">
+        🔗 <a href="{APP_URL}" style="color:#6db3ff;text-decoration:none;">{APP_URL}</a></div>
       <div style="color:{MUTED};font-size:12px;margin-bottom:16px;">
         마지막 점검 {now} · 대상 {base_url}</div>
 

@@ -28,6 +28,8 @@ from bs4 import BeautifulSoup
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = "https://www.lgtwins.com"
+# 배포된 대시보드 주소 (상단 표시용)
+APP_URL = "https://lgtwins-monitoring.streamlit.app/"
 
 # 모니터링 대상 페이지 정의.
 #   name         : 화면에 표시할 한글 이름
