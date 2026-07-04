@@ -11,7 +11,14 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+# 한국 표준시(UTC+9). 서버가 UTC(예: GitHub Actions)여도 항상 KST로 표기.
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst() -> datetime:
+    return datetime.now(KST)
 
 import requests
 import urllib3
@@ -80,7 +87,7 @@ class CheckResult:
     slow: bool = False
     level: str = "DOWN"              # UP / SLOW / WARN / DOWN
     message: str = ""
-    checked_at: str = field(default_factory=lambda: datetime.now().strftime("%H:%M:%S"))
+    checked_at: str = field(default_factory=lambda: now_kst().strftime("%H:%M:%S"))
 
 
 def _count_data(html: str, selector: str) -> int | None:

@@ -7,14 +7,13 @@ LG 트윈스 (www.lgtwins.com) 실시간 모니터링 대시보드.
 from __future__ import annotations
 
 from collections import deque
-from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from monitor import BASE_URL, TARGETS, check_all
+from monitor import BASE_URL, TARGETS, check_all, now_kst
 from mailer import send_report, validate_config
 from report import build_report
 
@@ -42,7 +41,7 @@ def init_state():
 
 def record_history(results):
     hist = st.session_state["history"]
-    now = datetime.now()
+    now = now_kst()
     for r in results:
         dq = hist.setdefault(r.name, deque(maxlen=HISTORY_MAXLEN))
         dq.append((now, r.elapsed_ms if r.elapsed_ms is not None else None, r.level))
@@ -299,7 +298,7 @@ def render_dashboard(cfg):
     record_history(results)
     st.session_state["last_results"] = results
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_kst().strftime("%Y-%m-%d %H:%M:%S") + " KST"
     st.caption(f"마지막 점검: **{now}**  ·  대상 {BASE_URL}  ·  "
                f"누적 점검 {st.session_state['run_count']}회"
                + (f"  ·  {cfg['interval']}초마다 자동 갱신" if cfg["auto"] else "  ·  자동 갱신 꺼짐"))
