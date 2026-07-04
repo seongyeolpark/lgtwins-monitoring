@@ -47,7 +47,8 @@ def validate_config(config: dict) -> list[str]:
 
 
 # cid -> 다운로드 첨부 파일명
-_ATTACH_NAME = {"chart": "response_times.png", "donut": "status_distribution.png"}
+_ATTACH_NAME = {"charts": "charts_overview.png",
+                "chart": "response_times.png", "donut": "status_distribution.png"}
 
 
 def send_report(config: dict, subject: str, html: str,

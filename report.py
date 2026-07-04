@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use("Agg")  # 반드시 pyplot import 전에
 import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 
 from monitor import now_kst
 
@@ -23,6 +24,11 @@ PANEL = "#1a1d24"    # 카드/표 배경
 GRID = "#2a2e37"     # 경계선
 TXT = "#e6e8eb"      # 기본 텍스트
 MUTED = "#8b93a1"    # 보조 텍스트
+
+# 응답시간 그라데이션(밝은 핑크 → 진한 크림슨): 느릴수록 진하게 강조 (대시보드 RESP_SCALE 와 동일)
+RESP_CMAP = LinearSegmentedColormap.from_list(
+    "resp", ["#fde4ee", "#f7a8c4", "#e0457e", "#c30452", "#7a0138"])
+NODATA_COLOR = "#555a63"  # 응답시간 없음(접속 실패)
 
 
 def _apply_korean_font():
@@ -86,12 +92,37 @@ def summarize(results) -> dict:
 def build_chart_png(results) -> bytes:
     """페이지별 응답시간 가로 막대 차트 PNG(bytes) — 다크 테마."""
     _apply_korean_font()
+    return build_charts_png(results)
+
+
+def _resp_colors(results):
+    """응답시간 기반 그라데이션 색상 리스트. 응답 없음은 회색."""
+    valid = [r.elapsed_ms for r in results if r.elapsed_ms is not None]
+    vmin, vmax = (min(valid), max(valid)) if valid else (0.0, 1.0)
+    norm = Normalize(vmin=vmin, vmax=vmax if vmax > vmin else vmin + 1)
+    colors = []
+    for r in results:
+        if r.elapsed_ms is None:
+            colors.append(NODATA_COLOR)
+        else:
+            colors.append(RESP_CMAP(norm(r.elapsed_ms)))
+    return colors
+
+
+def build_charts_png(results) -> bytes:
+    """대시보드처럼 좌:응답시간 막대(그라데이션) + 우:상태 분포 도넛 을
+    하나의 이미지에 가로로 나란히 렌더 — 다크 테마."""
+    _apply_korean_font()
     names = [r.name for r in results]
     vals = [r.elapsed_ms if r.elapsed_ms is not None else 0 for r in results]
-    colors = [LEVEL_COLOR.get(r.level, "#888") for r in results]
+    colors = _resp_colors(results)
 
-    fig, ax = plt.subplots(figsize=(8, max(3, len(results) * 0.34)), dpi=130)
+    fig = plt.figure(figsize=(11, max(4.5, len(results) * 0.34)), dpi=130)
     fig.patch.set_facecolor(BG)
+    gs = fig.add_gridspec(1, 2, width_ratios=[3, 2], wspace=0.28)
+
+    # 좌: 응답시간 막대 (그라데이션)
+    ax = fig.add_subplot(gs[0, 0])
     ax.set_facecolor(BG)
     y = range(len(names))
     ax.barh(list(y), vals, color=colors)
@@ -100,43 +131,34 @@ def build_chart_png(results) -> bytes:
     ax.invert_yaxis()
     ax.set_xlabel("응답시간 (ms)", fontsize=9, color=MUTED)
     ax.tick_params(axis="x", colors=MUTED)
+    ax.set_title("페이지별 응답시간", fontsize=12, fontweight="bold", color=TXT, loc="left")
     for i, v in enumerate(vals):
         ax.text(v, i, f" {v:.0f}", va="center", fontsize=7.5, color=TXT)
     ax.grid(axis="x", alpha=0.15, color=GRID)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    fig.tight_layout()
 
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", facecolor=BG)
-    plt.close(fig)
-    return buf.getvalue()
-
-
-def build_donut_png(results) -> bytes:
-    """상태 분포 도넛 차트 PNG(bytes) — 다크 테마."""
-    _apply_korean_font()
+    # 우: 상태 분포 도넛
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.set_facecolor(BG)
     counts = {}
     for r in results:
         counts[r.level] = counts.get(r.level, 0) + 1
-    labels, values, colors = [], [], []
+    labels, values, dcolors = [], [], []
     for lv in ("UP", "SLOW", "WARN", "DOWN"):
         if counts.get(lv):
             labels.append(f"{LEVEL_LABEL[lv]} {counts[lv]}")
             values.append(counts[lv])
-            colors.append(LEVEL_COLOR[lv])
-
-    fig, ax = plt.subplots(figsize=(4.6, 3.6), dpi=130)
-    fig.patch.set_facecolor(BG)
-    wedges, texts = ax.pie(
-        values, labels=labels, colors=colors, startangle=90,
+            dcolors.append(LEVEL_COLOR[lv])
+    ax2.pie(
+        values, labels=labels, colors=dcolors, startangle=90,
         wedgeprops=dict(width=0.42, edgecolor=BG, linewidth=2),
         textprops=dict(color=TXT, fontsize=10),
     )
-    ax.text(0, 0, f"{sum(values)}\n페이지", ha="center", va="center",
-            color=TXT, fontsize=13, fontweight="bold")
-    ax.set_aspect("equal")
-    fig.tight_layout()
+    ax2.text(0, 0, f"{sum(values)}\n페이지", ha="center", va="center",
+             color=TXT, fontsize=13, fontweight="bold")
+    ax2.set_aspect("equal")
+    ax2.set_title("상태 분포", fontsize=12, fontweight="bold", color=TXT)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", facecolor=BG)
@@ -232,11 +254,7 @@ def build_report(results, base_url: str):
         <tr>{cards}</tr>
       </table>
 
-      <div style="font-size:16px;font-weight:bold;margin:20px 0 8px;color:{TXT};">페이지별 응답시간</div>
-      <img src="cid:chart" style="width:100%;border-radius:10px;background:{BG};" alt="응답시간 차트"/>
-
-      <div style="font-size:16px;font-weight:bold;margin:22px 0 8px;color:{TXT};">상태 분포</div>
-      <img src="cid:donut" style="max-width:380px;border-radius:10px;background:{BG};" alt="상태 분포"/>
+      <img src="cid:charts" style="width:100%;border-radius:10px;background:{BG};margin-top:18px;" alt="응답시간·상태분포 차트"/>
 
       <div style="font-size:16px;font-weight:bold;margin:22px 0 8px;color:{TXT};">페이지별 상세</div>
       <table style="width:100%;border-collapse:collapse;background:{PANEL};
@@ -260,5 +278,5 @@ def build_report(results, base_url: str):
         본 메일은 LG트윈스 모니터링 대시보드에서 자동 발송되었습니다.</div>
     </div></body></html>"""
 
-    images = {"chart": build_chart_png(results), "donut": build_donut_png(results)}
+    images = {"charts": build_charts_png(results)}
     return subject, html, images

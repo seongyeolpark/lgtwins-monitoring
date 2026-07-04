@@ -28,6 +28,9 @@ LEVEL_COLOR = {"UP": "#2ecc71", "SLOW": "#f1c40f", "WARN": "#e67e22", "DOWN": "#
 LEVEL_EMOJI = {"UP": "🟢", "SLOW": "🟡", "WARN": "🟠", "DOWN": "🔴"}
 LEVEL_LABEL = {"UP": "정상", "SLOW": "느림", "WARN": "경고", "DOWN": "장애"}
 
+# 응답시간 그라데이션(밝은 핑크 → 진한 크림슨): 느릴수록 진하게 강조
+RESP_SCALE = ["#fde4ee", "#f7a8c4", "#e0457e", "#c30452", "#7a0138"]
+
 HISTORY_MAXLEN = 120  # 페이지별 최근 이력 보관 개수
 
 
@@ -219,7 +222,7 @@ def render_table(results):
 def render_charts(results):
     col1, col2 = st.columns([3, 2])
 
-    # 페이지별 응답시간 바 차트
+    # 페이지별 응답시간 바 차트 (응답시간 기반 크림슨 그라데이션: 느릴수록 진하게 강조)
     with col1:
         st.subheader("페이지별 응답시간")
         df = pd.DataFrame([{
@@ -229,12 +232,12 @@ def render_charts(results):
         } for r in results])
         fig = px.bar(
             df, x="응답(ms)", y="페이지", orientation="h",
-            color="상태", color_discrete_map=LEVEL_COLOR,
-            category_orders={"상태": ["UP", "SLOW", "WARN", "DOWN"]},
+            color="응답(ms)", color_continuous_scale=RESP_SCALE,
         )
         fig.update_layout(
             height=max(400, len(results) * 26), margin=dict(l=10, r=10, t=10, b=10),
-            yaxis=dict(autorange="reversed"), legend_title_text="",
+            yaxis=dict(autorange="reversed"),
+            coloraxis_colorbar=dict(title="ms", thickness=12),
         )
         st.plotly_chart(fig, use_container_width=True)
 
