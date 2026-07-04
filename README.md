@@ -37,7 +37,7 @@ Windows 에서는 `run.bat` 더블클릭.
 ### 2) 발송 방식 — GitHub Actions (권장, 앱이 꺼져 있어도 동작)
 `.github/workflows/monitor.yml` 이 자동 실행됩니다.
 - **30분마다** → 장애/경고가 있을 때만 메일(`alert`)
-- **매일 08:00 KST** → 정기 상태 리포트(`scheduled`)
+- **매일 06:00 · 18:00 KST** → 정기 상태 리포트(`scheduled`, 2회)
 
 GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에 등록:
 

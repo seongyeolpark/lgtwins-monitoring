@@ -54,7 +54,7 @@ _ATTACH_NAME = {"charts": "charts_overview.png",
 def send_report(config: dict, subject: str, html: str,
                 images: dict | None = None,
                 chart_png: bytes | None = None, chart_cid: str = "chart",
-                attach_downloadable: bool = True) -> None:
+                attach_downloadable: bool = False) -> None:
     """리포트 메일 발송. 실패 시 예외 발생.
 
     images: {cid: png_bytes} 형태의 인라인 이미지 모음 (HTML 의 cid:xxx 와 연결).

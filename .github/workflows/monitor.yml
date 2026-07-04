@@ -4,7 +4,8 @@ name: lgtwins-monitoring-mail
 on:
   schedule:
     - cron: "*/30 * * * *"   # 30분마다: 문제 있을 때만 메일(alert)
-    - cron: "0 23 * * *"     # 매일 08:00 KST(=23:00 UTC): 정기 리포트(scheduled)
+    - cron: "0 21 * * *"     # 매일 06:00 KST(=21:00 UTC 전날): 정기 리포트(scheduled)
+    - cron: "0 9 * * *"      # 매일 18:00 KST(=09:00 UTC): 정기 리포트(scheduled)
   workflow_dispatch:          # 수동 실행 버튼 (테스트용, 항상 리포트 발송)
 
 jobs:
@@ -31,7 +32,7 @@ jobs:
       - name: Decide mode
         id: mode
         run: |
-          if [ "${{ github.event.schedule }}" = "0 23 * * *" ]; then
+          if [ "${{ github.event.schedule }}" = "0 21 * * *" ] || [ "${{ github.event.schedule }}" = "0 9 * * *" ]; then
             echo "value=scheduled" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "value=scheduled" >> "$GITHUB_OUTPUT"
