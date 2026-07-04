@@ -45,10 +45,10 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions → New re
 |---|---|
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `465` |
-| `SMTP_USER` | `sungyoul81@gmail.com` |
+| `SMTP_USER` | `your-email@gmail.com` |
 | `SMTP_PASSWORD` | (16자리 앱 비밀번호) |
-| `MAIL_TO` | `sungyoul81@gmail.com` (여러 명은 콤마) |
-| `MAIL_FROM` | `sungyoul81@gmail.com` (선택) |
+| `MAIL_TO` | `your-email@gmail.com` (여러 명은 콤마) |
+| `MAIL_FROM` | `your-email@gmail.com` (선택) |
 
 등록 후 **Actions 탭 → 워크플로우 → Run workflow** 로 즉시 테스트 발송 가능.
 
@@ -59,9 +59,9 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions → New re
 
 ### 로컬에서 수동 발송 테스트
 ```bash
-set SMTP_USER=sungyoul81@gmail.com
+set SMTP_USER=your-email@gmail.com
 set SMTP_PASSWORD=앱비밀번호
-set MAIL_TO=sungyoul81@gmail.com
+set MAIL_TO=your-email@gmail.com
 python send_report.py --mode scheduled
 ```
 
