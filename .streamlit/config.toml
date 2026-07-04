@@ -1,0 +1,11 @@
+[theme]
+base = "dark"
+primaryColor = "#c30452"          # LG 트윈스 레드
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1a1d24"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
