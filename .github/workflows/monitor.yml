@@ -1,0 +1,43 @@
+name: lgtwins-monitoring-mail
+
+# 앱이 잠들어 있어도 동작하는 독립 점검+메일 발송 (무료 GitHub Actions cron)
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # 30분마다: 문제 있을 때만 메일(alert)
+    - cron: "0 23 * * *"     # 매일 08:00 KST(=23:00 UTC): 정기 리포트(scheduled)
+  workflow_dispatch:          # 수동 실행 버튼 (테스트용, 항상 리포트 발송)
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Decide mode
+        id: mode
+        run: |
+          if [ "${{ github.event.schedule }}" = "0 23 * * *" ]; then
+            echo "value=scheduled" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=scheduled" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=alert" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run check & send mail
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        run: python send_report.py --mode ${{ steps.mode.outputs.value }}

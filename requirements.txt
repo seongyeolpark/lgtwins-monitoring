@@ -3,3 +3,4 @@ requests>=2.31
 pandas>=2.0
 plotly>=5.20
 beautifulsoup4>=4.12
+matplotlib>=3.7

@@ -15,6 +15,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from monitor import BASE_URL, TARGETS, check_all
+from mailer import send_report, validate_config
+from report import build_chart_png, build_html
 
 st.set_page_config(
     page_title="LG트윈스 모니터링",
@@ -76,6 +78,9 @@ def sidebar_controls():
         st.rerun()
 
     st.sidebar.divider()
+    sidebar_mail_section(targets, timeout, verify)
+
+    st.sidebar.divider()
     if st.sidebar.button("🗑️ 이력 초기화", use_container_width=True):
         for k in ("history", "uptime_log", "last_results", "run_count"):
             st.session_state.pop(k, None)
@@ -84,6 +89,46 @@ def sidebar_controls():
 
     return {"auto": auto, "interval": interval, "timeout": timeout,
             "targets": targets, "verify": verify}
+
+
+def mail_config_from_secrets() -> dict | None:
+    """st.secrets 의 [smtp] 블록을 config 딕셔너리로 변환. 없으면 None."""
+    try:
+        smtp = st.secrets.get("smtp")
+    except Exception:  # secrets.toml 자체가 없을 때
+        return None
+    if not smtp:
+        return None
+    return {
+        "host": smtp.get("host", "smtp.gmail.com"),
+        "port": smtp.get("port", 465),
+        "user": smtp.get("user", ""),
+        "password": smtp.get("password", ""),
+        "sender": smtp.get("sender") or smtp.get("user", ""),
+        "recipients": smtp.get("recipients", ""),
+    }
+
+
+def sidebar_mail_section(targets, timeout, verify):
+    st.sidebar.subheader("📧 메일 알림")
+    cfg = mail_config_from_secrets()
+    if cfg is None or validate_config(cfg):
+        st.sidebar.caption("메일 설정이 없습니다. `.streamlit/secrets.toml`(또는 "
+                           "클라우드 Secrets)에 `[smtp]` 블록을 넣으면 활성화됩니다.")
+        return
+    st.sidebar.caption(f"수신: {cfg['recipients']}")
+    if st.sidebar.button("✉️ 현재 상태 메일 발송", use_container_width=True):
+        with st.spinner("점검 후 메일 발송 중…"):
+            results = st.session_state.get("last_results")
+            if not results:
+                results = check_all(targets, timeout=timeout, verify=verify)
+            try:
+                subject, html = build_html(results, BASE_URL)
+                png = build_chart_png(results)
+                send_report(cfg, subject, html, chart_png=png)
+                st.sidebar.success(f"발송 완료 → {cfg['recipients']}")
+            except Exception as e:  # noqa: BLE001
+                st.sidebar.error(f"발송 실패: {e}")
 
 
 # ---------------------------------------------------------------- 요약 지표
