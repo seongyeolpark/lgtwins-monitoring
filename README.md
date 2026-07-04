@@ -36,7 +36,7 @@ Windows 에서는 `run.bat` 더블클릭.
 
 ### 2) 발송 방식 — GitHub Actions (권장, 앱이 꺼져 있어도 동작)
 `.github/workflows/monitor.yml` 이 자동 실행됩니다.
-- **30분마다** → 장애/경고가 있을 때만 메일(`alert`)
+- **1시간마다** → 장애/경고가 있을 때만 메일(`alert`)
 - **매일 06:00 · 18:00 KST** → 정기 상태 리포트(`scheduled`, 2회)
 
 GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에 등록:
@@ -69,6 +69,6 @@ python send_report.py --mode scheduled
 - 사내망에서는 프록시 self-signed 인증서 때문에 SSL 검증을 꺼야 정상 동작합니다
   (사이드바 `SSL 인증서 검증` 옵션, 기본 꺼짐). 공개 클라우드/GitHub Actions 에서는 켜도 무방합니다.
 - 모니터링 대상/기대 데이터 건수는 `monitor.py` 의 `TARGETS` 리스트에서 조정합니다.
-- ⚠️ `alert` 모드는 문제가 지속되면 30분마다 재발송됩니다. 빈도를 줄이려면 workflow 의 cron 을 조정하세요.
+- ⚠️ `alert` 모드는 문제가 지속되면 1시간마다 재발송됩니다. 빈도를 줄이려면 workflow 의 cron 을 조정하세요.
 - ⚠️ 앱 내 자동 발송이 아니라 **GitHub Actions** 가 알림을 담당합니다
   (Streamlit Cloud 앱은 유휴 시 잠들기 때문).
