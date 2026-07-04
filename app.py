@@ -16,7 +16,7 @@ import streamlit as st
 
 from monitor import BASE_URL, TARGETS, check_all
 from mailer import send_report, validate_config
-from report import build_chart_png, build_html
+from report import build_report
 
 st.set_page_config(
     page_title="LG트윈스 모니터링",
@@ -123,9 +123,8 @@ def sidebar_mail_section(targets, timeout, verify):
             if not results:
                 results = check_all(targets, timeout=timeout, verify=verify)
             try:
-                subject, html = build_html(results, BASE_URL)
-                png = build_chart_png(results)
-                send_report(cfg, subject, html, chart_png=png)
+                subject, html, images = build_report(results, BASE_URL)
+                send_report(cfg, subject, html, images=images)
                 st.sidebar.success(f"발송 완료 → {cfg['recipients']}")
             except Exception as e:  # noqa: BLE001
                 st.sidebar.error(f"발송 실패: {e}")

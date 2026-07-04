@@ -1,5 +1,7 @@
 """
 점검 결과 -> 이메일용 HTML 본문 + 차트 PNG 생성.
+Streamlit 대시보드와 동일한 구성(다크 테마):
+  배너 → 6지표 카드 → 페이지별 응답시간(막대) → 상태 분포(도넛) → 페이지별 상세표
 matplotlib 는 헤드리스(Agg) 백엔드로 GitHub Actions / 클라우드에서 안전하게 동작.
 """
 from __future__ import annotations
@@ -14,6 +16,13 @@ from matplotlib import font_manager, rcParams
 
 LEVEL_COLOR = {"UP": "#2ecc71", "SLOW": "#f1c40f", "WARN": "#e67e22", "DOWN": "#e74c3c"}
 LEVEL_LABEL = {"UP": "정상", "SLOW": "느림", "WARN": "경고", "DOWN": "장애"}
+
+# 대시보드와 맞춘 다크 팔레트
+BG = "#0e1117"       # 전체 배경
+PANEL = "#1a1d24"    # 카드/표 배경
+GRID = "#2a2e37"     # 경계선
+TXT = "#e6e8eb"      # 기본 텍스트
+MUTED = "#8b93a1"    # 보조 텍스트
 
 
 def _apply_korean_font():
@@ -61,122 +70,195 @@ def summarize(results) -> dict:
     down = sum(1 for r in results if r.level == "DOWN")
     healthy = up + slow
     valid_ms = [r.elapsed_ms for r in results if r.elapsed_ms is not None]
+    data_targets = [r for r in results if r.data_min is not None]
+    data_ok = sum(1 for r in data_targets if r.data_ok)
     return {
         "total": total, "up": up, "slow": slow, "warn": warn, "down": down,
         "healthy": healthy,
         "ratio": (healthy / total * 100) if total else 0,
         "avg_ms": (sum(valid_ms) / len(valid_ms)) if valid_ms else 0,
+        "data_total": len(data_targets), "data_ok": data_ok,
+        "data_fail": len(data_targets) - data_ok,
         "has_problem": (down + warn) > 0,
     }
 
 
 def build_chart_png(results) -> bytes:
-    """페이지별 응답시간 가로 막대 차트 PNG(bytes)."""
+    """페이지별 응답시간 가로 막대 차트 PNG(bytes) — 다크 테마."""
     _apply_korean_font()
     names = [r.name for r in results]
     vals = [r.elapsed_ms if r.elapsed_ms is not None else 0 for r in results]
     colors = [LEVEL_COLOR.get(r.level, "#888") for r in results]
 
     fig, ax = plt.subplots(figsize=(8, max(3, len(results) * 0.34)), dpi=130)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
     y = range(len(names))
     ax.barh(list(y), vals, color=colors)
     ax.set_yticks(list(y))
-    ax.set_yticklabels(names, fontsize=9)
+    ax.set_yticklabels(names, fontsize=9, color=TXT)
     ax.invert_yaxis()
-    ax.set_xlabel("응답시간 (ms)", fontsize=9)
-    ax.set_title("페이지별 응답시간", fontsize=11, fontweight="bold")
+    ax.set_xlabel("응답시간 (ms)", fontsize=9, color=MUTED)
+    ax.tick_params(axis="x", colors=MUTED)
     for i, v in enumerate(vals):
-        ax.text(v, i, f" {v:.0f}", va="center", fontsize=7.5)
-    ax.grid(axis="x", alpha=0.25)
+        ax.text(v, i, f" {v:.0f}", va="center", fontsize=7.5, color=TXT)
+    ax.grid(axis="x", alpha=0.15, color=GRID)
+    for spine in ax.spines.values():
+        spine.set_color(GRID)
     fig.tight_layout()
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
+    fig.savefig(buf, format="png", bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     return buf.getvalue()
 
 
-def build_html(results, base_url: str, chart_cid: str = "chart") -> tuple[str, str]:
-    """HTML 본문과 제목을 만든다. chart_cid 는 인라인 이미지 참조용."""
+def build_donut_png(results) -> bytes:
+    """상태 분포 도넛 차트 PNG(bytes) — 다크 테마."""
+    _apply_korean_font()
+    counts = {}
+    for r in results:
+        counts[r.level] = counts.get(r.level, 0) + 1
+    labels, values, colors = [], [], []
+    for lv in ("UP", "SLOW", "WARN", "DOWN"):
+        if counts.get(lv):
+            labels.append(f"{LEVEL_LABEL[lv]} {counts[lv]}")
+            values.append(counts[lv])
+            colors.append(LEVEL_COLOR[lv])
+
+    fig, ax = plt.subplots(figsize=(4.6, 3.6), dpi=130)
+    fig.patch.set_facecolor(BG)
+    wedges, texts = ax.pie(
+        values, labels=labels, colors=colors, startangle=90,
+        wedgeprops=dict(width=0.42, edgecolor=BG, linewidth=2),
+        textprops=dict(color=TXT, fontsize=10),
+    )
+    ax.text(0, 0, f"{sum(values)}\n페이지", ha="center", va="center",
+            color=TXT, fontsize=13, fontweight="bold")
+    ax.set_aspect("equal")
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", facecolor=BG)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def _metric_card(label: str, value: str, color: str = TXT) -> str:
+    return f"""<td style="padding:12px 10px;background:{PANEL};border-radius:10px;
+      text-align:center;">
+      <div style="font-size:12px;color:{MUTED};margin-bottom:4px;">{label}</div>
+      <div style="font-size:22px;font-weight:bold;color:{color};">{value}</div></td>"""
+
+
+def build_report(results, base_url: str):
+    """대시보드와 동일한 형태의 메일을 구성한다.
+    반환: (subject, html, images)  images = {cid: png_bytes}
+    """
     s = summarize(results)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if s["down"] > 0:
-        banner_bg, banner_txt = "#e74c3c", f"🔴 장애 감지 {s['down']}건 · 가용률 {s['ratio']:.1f}%"
+        banner_bg = "#e74c3c"
+        banner_txt = f"🔴 장애 감지 {s['down']}건 · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 🔴 장애 {s['down']}건 발생 ({now})"
     elif s["warn"] > 0:
-        banner_bg, banner_txt = "#e67e22", f"🟠 경고 {s['warn']}건(데이터/화면 이상) · 가용률 {s['ratio']:.1f}%"
+        banner_bg = "#e67e22"
+        extra = f" (데이터 미출력 {s['data_fail']}건 포함)" if s["data_fail"] else ""
+        banner_txt = f"🟠 경고 {s['warn']}건{extra} · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 🟠 경고 {s['warn']}건 ({now})"
     elif s["slow"] > 0:
-        banner_bg, banner_txt = "#b7950b", f"🟡 응답 지연 {s['slow']}건 · 그 외 정상"
+        banner_bg = "#b7950b"
+        banner_txt = f"🟡 응답 지연 {s['slow']}건 · 화면·데이터 모두 정상"
         subject = f"[LG트윈스 모니터링] 🟡 지연 {s['slow']}건 ({now})"
     else:
-        banner_bg, banner_txt = "#2ecc71", f"🟢 모든 페이지 정상 · 가용률 {s['ratio']:.1f}%"
+        banner_bg = "#2ecc71"
+        banner_txt = f"🟢 모든 페이지 정상 · 화면·데이터 이상 없음 · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 🟢 전체 정상 ({now})"
 
+    # 지표 카드 6개 (대시보드와 동일)
+    cards = "".join([
+        _metric_card("전체 페이지", f"{s['total']}개"),
+        '<td style="width:8px;"></td>',
+        _metric_card("정상 가동", f"{s['healthy']}개", "#2ecc71"),
+        '<td style="width:8px;"></td>',
+        _metric_card("데이터 정상", f"{s['data_ok']}/{s['data_total']}",
+                     "#e74c3c" if s["data_fail"] else TXT),
+        '<td style="width:8px;"></td>',
+        _metric_card("평균 응답시간", f"{s['avg_ms']:.0f}ms"),
+        '<td style="width:8px;"></td>',
+        _metric_card("느림/경고", f"{s['slow'] + s['warn']}개",
+                     "#e67e22" if (s["slow"] + s["warn"]) else TXT),
+        '<td style="width:8px;"></td>',
+        _metric_card("장애", f"{s['down']}개", "#e74c3c" if s["down"] else TXT),
+    ])
+
+    # 페이지별 상세표 (대시보드 컬럼 구성)
     rows = []
-    for r in results:
+    for i, r in enumerate(results):
         c = LEVEL_COLOR.get(r.level, "#888")
-        data_cell = (f"{r.data_count}건" if r.data_count is not None else "-")
+        rowbg = PANEL if i % 2 == 0 else "#161920"
+        size_kb = f"{r.content_bytes / 1024:.1f}" if r.content_bytes else "-"
+        render_ok = "✔" if r.content_ok else "✖"
+        data_cell = f"{'✔' if r.data_ok else '✖'} {r.data_count}건" if r.data_count is not None else "-"
         rows.append(f"""
-        <tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;">
+        <tr style="background:{rowbg};">
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};white-space:nowrap;">
             <span style="display:inline-block;width:9px;height:9px;border-radius:50%;
               background:{c};margin-right:6px;"></span>{LEVEL_LABEL.get(r.level, r.level)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;">{r.name}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">{r.status_code or '-'}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">{(f'{r.elapsed_ms:.0f}' if r.elapsed_ms is not None else '-')}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">{data_cell}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#555;">{r.message}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};">{r.name}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};color:{MUTED};">{r.category}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{r.status_code or '-'}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:right;">{(f'{r.elapsed_ms:.0f}' if r.elapsed_ms is not None else '-')}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:right;color:{MUTED};">{size_kb}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{render_ok}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{data_cell}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};color:{MUTED};">{r.message}</td>
         </tr>""")
 
-    html = f"""<!DOCTYPE html><html><body style="margin:0;background:#f4f5f7;
-      font-family:'Malgun Gothic',AppleGothic,sans-serif;">
-    <div style="max-width:760px;margin:0 auto;padding:20px;">
-      <h2 style="margin:0 0 4px;color:#111;">⚾ LG 트윈스 홈페이지 모니터링</h2>
-      <div style="color:#888;font-size:12px;margin-bottom:14px;">
-        점검 시각 {now} · 대상 {base_url}</div>
+    html = f"""<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1"></head>
+    <body style="margin:0;background:{BG};
+      font-family:'Malgun Gothic','Apple SD Gothic Neo',AppleGothic,sans-serif;color:{TXT};">
+    <div style="max-width:820px;margin:0 auto;padding:22px;">
+      <h2 style="margin:0 0 4px;color:{TXT};">⚾ LG 트윈스 홈페이지 모니터링</h2>
+      <div style="color:{MUTED};font-size:12px;margin-bottom:16px;">
+        마지막 점검 {now} · 대상 {base_url}</div>
 
-      <div style="background:{banner_bg};color:#fff;padding:12px 16px;border-radius:8px;
+      <div style="background:{banner_bg};color:#fff;padding:13px 16px;border-radius:10px;
         font-weight:bold;font-size:15px;">{banner_txt}</div>
 
-      <table style="width:100%;margin:16px 0;border-collapse:collapse;text-align:center;">
-        <tr>
-          <td style="padding:10px;background:#fff;border-radius:8px;">
-            <div style="font-size:12px;color:#888;">전체</div>
-            <div style="font-size:22px;font-weight:bold;">{s['total']}</div></td>
-          <td style="width:8px;"></td>
-          <td style="padding:10px;background:#fff;border-radius:8px;">
-            <div style="font-size:12px;color:#888;">정상 가동</div>
-            <div style="font-size:22px;font-weight:bold;color:#2ecc71;">{s['healthy']}</div></td>
-          <td style="width:8px;"></td>
-          <td style="padding:10px;background:#fff;border-radius:8px;">
-            <div style="font-size:12px;color:#888;">평균 응답</div>
-            <div style="font-size:22px;font-weight:bold;">{s['avg_ms']:.0f}ms</div></td>
-          <td style="width:8px;"></td>
-          <td style="padding:10px;background:#fff;border-radius:8px;">
-            <div style="font-size:12px;color:#888;">장애</div>
-            <div style="font-size:22px;font-weight:bold;color:#e74c3c;">{s['down']}</div></td>
-        </tr>
+      <table style="width:100%;margin:16px 0;border-collapse:separate;">
+        <tr>{cards}</tr>
       </table>
 
-      <img src="cid:{chart_cid}" style="width:100%;border-radius:8px;background:#fff;" alt="응답시간 차트"/>
+      <div style="font-size:16px;font-weight:bold;margin:20px 0 8px;color:{TXT};">페이지별 응답시간</div>
+      <img src="cid:chart" style="width:100%;border-radius:10px;background:{BG};" alt="응답시간 차트"/>
 
-      <table style="width:100%;margin-top:16px;border-collapse:collapse;background:#fff;
-        border-radius:8px;overflow:hidden;font-size:13px;">
+      <div style="font-size:16px;font-weight:bold;margin:22px 0 8px;color:{TXT};">상태 분포</div>
+      <img src="cid:donut" style="max-width:380px;border-radius:10px;background:{BG};" alt="상태 분포"/>
+
+      <div style="font-size:16px;font-weight:bold;margin:22px 0 8px;color:{TXT};">페이지별 상세</div>
+      <table style="width:100%;border-collapse:collapse;background:{PANEL};
+        border-radius:10px;overflow:hidden;font-size:13px;color:{TXT};">
         <thead>
-          <tr style="background:#1a1d24;color:#fff;text-align:left;">
-            <th style="padding:8px;">상태</th><th style="padding:8px;">페이지</th>
-            <th style="padding:8px;text-align:center;">HTTP</th>
-            <th style="padding:8px;text-align:right;">응답(ms)</th>
-            <th style="padding:8px;text-align:right;">데이터</th>
-            <th style="padding:8px;">메시지</th>
+          <tr style="background:#12141a;color:{TXT};text-align:left;">
+            <th style="padding:8px 9px;">상태</th><th style="padding:8px 9px;">페이지</th>
+            <th style="padding:8px 9px;">분류</th>
+            <th style="padding:8px 9px;text-align:center;">HTTP</th>
+            <th style="padding:8px 9px;text-align:right;">응답(ms)</th>
+            <th style="padding:8px 9px;text-align:right;">크기(KB)</th>
+            <th style="padding:8px 9px;text-align:center;">렌더</th>
+            <th style="padding:8px 9px;text-align:center;">데이터</th>
+            <th style="padding:8px 9px;">메시지</th>
           </tr>
         </thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
 
-      <div style="color:#aaa;font-size:11px;margin-top:14px;">
+      <div style="color:{MUTED};font-size:11px;margin-top:16px;">
         본 메일은 LG트윈스 모니터링 대시보드에서 자동 발송되었습니다.</div>
     </div></body></html>"""
-    return subject, html
+
+    images = {"chart": build_chart_png(results), "donut": build_donut_png(results)}
+    return subject, html, images

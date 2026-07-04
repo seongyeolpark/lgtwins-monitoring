@@ -16,7 +16,7 @@ import sys
 
 from mailer import clean_addr, clean_password, send_report, validate_config
 from monitor import BASE_URL, check_all
-from report import build_chart_png, build_html, summarize
+from report import build_report, summarize
 
 
 def config_from_env() -> dict:
@@ -64,9 +64,8 @@ def main() -> int:
         print("[INFO] 이상 없음 → alert 메일 생략")
         return 0
 
-    subject, html = build_html(results, BASE_URL)
-    chart = build_chart_png(results)
-    send_report(config, subject, html, chart_png=chart)
+    subject, html, images = build_report(results, BASE_URL)
+    send_report(config, subject, html, images=images)
     print(f"[INFO] 메일 발송 완료 → {config['recipients']}")
     return 0
 
