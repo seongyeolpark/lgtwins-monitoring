@@ -173,7 +173,8 @@ def build_charts_png(results) -> bytes:
 
 
 def _metric_card(label: str, value: str, color: str = TXT) -> str:
-    return f"""<td style="padding:12px 10px;background:{PANEL};border-radius:10px;
+    # bgcolor 속성 병행 → 배경색을 무시하는 클라이언트에서도 어두운 카드 유지
+    return f"""<td bgcolor="{PANEL}" style="padding:12px 10px;background:{PANEL};border-radius:10px;
       text-align:center;">
       <div style="font-size:12px;color:{MUTED};margin-bottom:4px;">{label}</div>
       <div style="font-size:22px;font-weight:bold;color:{color};">{value}</div></td>"""
@@ -190,20 +191,20 @@ def build_report(results, base_url: str):
     # 깨지므로 이모지 없이 텍스트로만 구성한다.
     if s["down"] > 0:
         banner_bg = "#e74c3c"
-        banner_txt = f"🔴 장애 감지 {s['down']}건 · 가용률 {s['ratio']:.1f}%"
+        banner_txt = f"장애 감지 {s['down']}건 · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 장애 {s['down']}건 발생 ({now})"
     elif s["warn"] > 0:
         banner_bg = "#e67e22"
         extra = f" (데이터 미출력 {s['data_fail']}건 포함)" if s["data_fail"] else ""
-        banner_txt = f"🟠 경고 {s['warn']}건{extra} · 가용률 {s['ratio']:.1f}%"
+        banner_txt = f"경고 {s['warn']}건{extra} · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 경고 {s['warn']}건 ({now})"
     elif s["slow"] > 0:
         banner_bg = "#b7950b"
-        banner_txt = f"🟡 응답 지연 {s['slow']}건 · 화면·데이터 모두 정상"
+        banner_txt = f"응답 지연 {s['slow']}건 · 화면·데이터 모두 정상"
         subject = f"[LG트윈스 모니터링] 지연 {s['slow']}건 ({now})"
     else:
         banner_bg = "#2ecc71"
-        banner_txt = f"🟢 모든 페이지 정상 · 화면·데이터 이상 없음 · 가용률 {s['ratio']:.1f}%"
+        banner_txt = f"모든 페이지 정상 · 화면·데이터 이상 없음 · 가용률 {s['ratio']:.1f}%"
         subject = f"[LG트윈스 모니터링] 전체 정상 ({now})"
 
     # 지표 카드 6개 (대시보드와 동일)
@@ -232,10 +233,10 @@ def build_report(results, base_url: str):
         render_cell = "✔" if r.content_ok else "✖"
         data_cell = f"{'✔' if r.data_ok else '✖'} {r.data_count}건" if r.data_count is not None else "-"
         rows.append(f"""
-        <tr style="background:{rowbg};">
-          <td style="padding:7px 9px;border-bottom:1px solid {GRID};white-space:nowrap;">
+        <tr bgcolor="{rowbg}" style="background-color:{rowbg};">
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};white-space:nowrap;color:{TXT};">
             <span style="display:inline-block;width:9px;height:9px;border-radius:50%;
-              background:{c};margin-right:6px;"></span>{LEVEL_LABEL.get(r.level, r.level)}</td>
+              background-color:{c};margin-right:6px;"></span>{LEVEL_LABEL.get(r.level, r.level)}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};">{r.name}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};color:{MUTED};">{r.category}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{r.status_code or '-'}</td>
@@ -247,30 +248,44 @@ def build_report(results, base_url: str):
         </tr>""")
 
     html = f"""<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1"></head>
-    <body style="margin:0;background:{BG};
-      font-family:'Malgun Gothic','Apple SD Gothic Neo',AppleGothic,sans-serif;color:{TXT};">
-    <div style="max-width:820px;margin:0 auto;padding:22px;">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark"></head>
+    <body style="margin:0;padding:0;background-color:{BG};
+      font-family:'Malgun Gothic','Apple SD Gothic Neo',AppleGothic,sans-serif;">
+    <!-- 배경색을 무시하는 클라이언트 대비: 표 bgcolor 속성으로 다크 배경 강제 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+      bgcolor="{BG}" style="background-color:{BG};">
+      <tr><td align="center" style="padding:22px;background-color:{BG};">
+      <table role="presentation" width="820" cellpadding="0" cellspacing="0" border="0"
+        bgcolor="{BG}" style="width:100%;max-width:820px;background-color:{BG};">
+      <tr><td style="background-color:{BG};color:{TXT};">
+
       <h2 style="margin:0 0 4px;color:{TXT};">⚾ LG 트윈스 홈페이지 모니터링</h2>
-      <div style="margin:2px 0 6px;font-size:13px;">
+      <div style="margin:2px 0 6px;font-size:13px;color:{TXT};">
         대시보드: <a href="{APP_URL}" style="color:#6db3ff;text-decoration:none;">{APP_URL}</a></div>
       <div style="color:{MUTED};font-size:12px;margin-bottom:16px;">
         마지막 점검 {now} · 대상 {base_url}</div>
 
-      <div style="background:{banner_bg};color:#fff;padding:13px 16px;border-radius:10px;
-        font-weight:bold;font-size:15px;">{banner_txt}</div>
+      <div style="background-color:{banner_bg};color:#ffffff;padding:13px 16px;border-radius:10px;
+        font-weight:bold;font-size:15px;">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:50%;
+          background-color:#ffffff;margin-right:9px;vertical-align:middle;"></span>{banner_txt}</div>
 
-      <table style="width:100%;margin:16px 0;border-collapse:separate;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+        style="margin:16px 0;">
         <tr>{cards}</tr>
       </table>
 
-      <img src="cid:charts" style="width:100%;border-radius:10px;background:{BG};margin-top:18px;" alt="응답시간·상태분포 차트"/>
+      <img src="cid:charts" width="820" style="width:100%;max-width:820px;border-radius:10px;
+        display:block;background-color:{BG};margin-top:18px;" alt="응답시간·상태분포 차트"/>
 
       <div style="font-size:16px;font-weight:bold;margin:22px 0 8px;color:{TXT};">페이지별 상세</div>
-      <table style="width:100%;border-collapse:collapse;background:{PANEL};
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+        bgcolor="{PANEL}" style="border-collapse:collapse;background-color:{PANEL};
         border-radius:10px;overflow:hidden;font-size:13px;color:{TXT};">
         <thead>
-          <tr style="background:#12141a;color:{TXT};text-align:left;">
+          <tr bgcolor="#12141a" style="background-color:#12141a;color:{TXT};text-align:left;">
             <th style="padding:8px 9px;">상태</th><th style="padding:8px 9px;">페이지</th>
             <th style="padding:8px 9px;">분류</th>
             <th style="padding:8px 9px;text-align:center;">HTTP</th>
@@ -286,7 +301,10 @@ def build_report(results, base_url: str):
 
       <div style="color:{MUTED};font-size:11px;margin-top:16px;">
         본 메일은 LG트윈스 모니터링 대시보드에서 자동 발송되었습니다.</div>
-    </div></body></html>"""
+
+      </td></tr></table>
+      </td></tr></table>
+    </body></html>"""
 
     images = {"charts": build_charts_png(results)}
     return subject, html, images
