@@ -186,23 +186,25 @@ def build_report(results, base_url: str):
     s = summarize(results)
     now = now_kst().strftime("%Y-%m-%d %H:%M:%S") + " KST"
 
+    # 본문 배너는 이모지 유지. 단, 제목(subject)은 사내 메일에서 이모지가
+    # 깨지므로 이모지 없이 텍스트로만 구성한다.
     if s["down"] > 0:
         banner_bg = "#e74c3c"
         banner_txt = f"🔴 장애 감지 {s['down']}건 · 가용률 {s['ratio']:.1f}%"
-        subject = f"[LG트윈스 모니터링] 🔴 장애 {s['down']}건 발생 ({now})"
+        subject = f"[LG트윈스 모니터링] 장애 {s['down']}건 발생 ({now})"
     elif s["warn"] > 0:
         banner_bg = "#e67e22"
         extra = f" (데이터 미출력 {s['data_fail']}건 포함)" if s["data_fail"] else ""
         banner_txt = f"🟠 경고 {s['warn']}건{extra} · 가용률 {s['ratio']:.1f}%"
-        subject = f"[LG트윈스 모니터링] 🟠 경고 {s['warn']}건 ({now})"
+        subject = f"[LG트윈스 모니터링] 경고 {s['warn']}건 ({now})"
     elif s["slow"] > 0:
         banner_bg = "#b7950b"
         banner_txt = f"🟡 응답 지연 {s['slow']}건 · 화면·데이터 모두 정상"
-        subject = f"[LG트윈스 모니터링] 🟡 지연 {s['slow']}건 ({now})"
+        subject = f"[LG트윈스 모니터링] 지연 {s['slow']}건 ({now})"
     else:
         banner_bg = "#2ecc71"
         banner_txt = f"🟢 모든 페이지 정상 · 화면·데이터 이상 없음 · 가용률 {s['ratio']:.1f}%"
-        subject = f"[LG트윈스 모니터링] 🟢 전체 정상 ({now})"
+        subject = f"[LG트윈스 모니터링] 전체 정상 ({now})"
 
     # 지표 카드 6개 (대시보드와 동일)
     cards = "".join([
@@ -227,7 +229,7 @@ def build_report(results, base_url: str):
         c = LEVEL_COLOR.get(r.level, "#888")
         rowbg = PANEL if i % 2 == 0 else "#161920"
         size_kb = f"{r.content_bytes / 1024:.1f}" if r.content_bytes else "-"
-        render_ok = "✔" if r.content_ok else "✖"
+        render_cell = "✔" if r.content_ok else "✖"
         data_cell = f"{'✔' if r.data_ok else '✖'} {r.data_count}건" if r.data_count is not None else "-"
         rows.append(f"""
         <tr style="background:{rowbg};">
@@ -239,7 +241,7 @@ def build_report(results, base_url: str):
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{r.status_code or '-'}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:right;">{(f'{r.elapsed_ms:.0f}' if r.elapsed_ms is not None else '-')}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:right;color:{MUTED};">{size_kb}</td>
-          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{render_ok}</td>
+          <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{render_cell}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};text-align:center;">{data_cell}</td>
           <td style="padding:7px 9px;border-bottom:1px solid {GRID};color:{MUTED};">{r.message}</td>
         </tr>""")
