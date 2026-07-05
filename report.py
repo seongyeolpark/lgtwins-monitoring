@@ -253,7 +253,7 @@ def build_report(results, base_url: str):
     <div style="max-width:820px;margin:0 auto;padding:22px;">
       <h2 style="margin:0 0 4px;color:{TXT};">⚾ LG 트윈스 홈페이지 모니터링</h2>
       <div style="margin:2px 0 6px;font-size:13px;">
-        🔗 <a href="{APP_URL}" style="color:#6db3ff;text-decoration:none;">{APP_URL}</a></div>
+        대시보드: <a href="{APP_URL}" style="color:#6db3ff;text-decoration:none;">{APP_URL}</a></div>
       <div style="color:{MUTED};font-size:12px;margin-bottom:16px;">
         마지막 점검 {now} · 대상 {base_url}</div>
 
